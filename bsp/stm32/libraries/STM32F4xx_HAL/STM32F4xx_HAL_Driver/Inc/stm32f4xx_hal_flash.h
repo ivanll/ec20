@@ -296,7 +296,7 @@ typedef struct
 /* Include FLASH HAL Extension module */
 #include "stm32f4xx_hal_flash_ex.h"
 #include "stm32f4xx_hal_flash_ramfunc.h"
-
+#include "stm32f4xx_hal_def.h"
 /* Exported functions --------------------------------------------------------*/
 /** @addtogroup FLASH_Exported_Functions
   * @{

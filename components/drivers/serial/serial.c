@@ -27,7 +27,7 @@
 #include <rthw.h>
 #include <rtthread.h>
 #include <rtdevice.h>
-
+#include "board.h"
 #define DBG_TAG    "UART"
 #define DBG_LVL    DBG_INFO
 #include <rtdbg.h>
@@ -1166,9 +1166,13 @@ void rt_hw_serial_isr(struct rt_serial_device *serial, int event)
 
             while (1)
             {
+								
                 ch = serial->ops->getc(serial);
-                if (ch == -1) break;
-
+                if (ch == -1) 
+								{
+									find_usart1_date_flag = 0;
+									break;
+								}
                 /* disable interrupt */
                 level = rt_hw_interrupt_disable();
 								/*接收数据缓冲区，数据个数*/
@@ -1208,8 +1212,7 @@ void rt_hw_serial_isr(struct rt_serial_device *serial, int event)
                 {
                     serial->parent.rx_indicate(&serial->parent, rx_length);
                 }
-								//接收数据长度
-								usart1_rec_length = rx_length;
+								
             }
 						
 

@@ -14,6 +14,9 @@
 #include "uart_config.h"
 #include "board.h"
 
+uint8_t find_usart1_date_flag = 0;
+
+
 #ifdef RT_USING_SERIAL
 
 #include <rtdevice.h>
@@ -574,11 +577,31 @@ void USART1_IRQHandler(void)
 {
     /* enter interrupt */
     rt_interrupt_enter();
+		struct rt_serial_device *serial = &(uart_obj[UART1_INDEX].serial);
+		struct stm32_uart *uart;
 
-    uart_isr(&(uart_obj[UART1_INDEX].serial));
+	  //重启定时器
+		restart_timer();
+	
+		RT_ASSERT(serial != RT_NULL);
+		uart = rt_container_of(serial, struct stm32_uart, serial);
+
+		/* UART in mode Receiver -------------------------------------------------*/
+		if ((__HAL_UART_GET_FLAG(&(uart->handle), UART_FLAG_RXNE) != RESET) &&
+						(__HAL_UART_GET_IT_SOURCE(&(uart->handle), UART_IT_RXNE) != RESET))
+		{
+			  
+				usart1_rec_buff[usart1_rec_length++] = uart->handle.Instance->DR & 0xff;
+		}
 		
-		//数据接收完成 发送事件标志
-		rt_event_send(&event,EVENT_FLAG_usart1);
+		if (__HAL_UART_GET_FLAG(&(uart->handle), UART_FLAG_RXNE) != RESET)
+		{
+				UART_INSTANCE_CLEAR_FUNCTION(&(uart->handle), UART_FLAG_RXNE);
+		}
+
+    //uart_isr(&(uart_obj[UART1_INDEX].serial));
+		
+
 
     /* leave interrupt */
     rt_interrupt_leave();
@@ -612,31 +635,7 @@ void USART3_IRQHandler(void)
 }
 #endif /* BSP_USING_UART3*/
 
-#if defined(BSP_USING_UART4)
-void UART4_IRQHandler(void)
-{
-    /* enter interrupt */
-    rt_interrupt_enter();
 
-    uart_isr(&(uart_obj[UART4_INDEX].serial));
-
-    /* leave interrupt */
-    rt_interrupt_leave();
-}
-#endif /* BSP_USING_UART4*/
-
-#if defined(BSP_USING_UART5)
-void UART5_IRQHandler(void)
-{
-    /* enter interrupt */
-    rt_interrupt_enter();
-
-    uart_isr(&(uart_obj[UART5_INDEX].serial));
-
-    /* leave interrupt */
-    rt_interrupt_leave();
-}
-#endif /* BSP_USING_UART5*/
 
 #if defined(BSP_USING_UART6)
 void USART6_IRQHandler(void)
@@ -651,31 +650,10 @@ void USART6_IRQHandler(void)
 }
 #endif /* BSP_USING_UART5*/
 
-#if defined(BSP_USING_UART7)
-void UART7_IRQHandler(void)
-{
-    /* enter interrupt */
-    rt_interrupt_enter();
 
-    uart_isr(&(uart_obj[UART7_INDEX].serial));
 
-    /* leave interrupt */
-    rt_interrupt_leave();
-}
-#endif /* BSP_USING_UART7*/
 
-#if defined(BSP_USING_UART8)
-void UART8_IRQHandler(void)
-{
-    /* enter interrupt */
-    rt_interrupt_enter();
 
-    uart_isr(&(uart_obj[UART8_INDEX].serial));
-
-    /* leave interrupt */
-    rt_interrupt_leave();
-}
-#endif /* BSP_USING_UART8*/
 
 
 /**
@@ -700,6 +678,8 @@ int rt_hw_usart_init(void)
     struct serial_configure config = RT_SERIAL_CONFIG_DEFAULT;
     rt_err_t result = 0;
 		struct stm32_uart *uart;
+		static rt_device_t serial;                /* 串口设备句柄 */
+
 
     //stm32_uart_get_dma_config();
 
@@ -712,10 +692,26 @@ int rt_hw_usart_init(void)
         result = rt_hw_serial_register(&uart_obj[i].serial, uart_obj[i].config->name,
                                        RT_DEVICE_FLAG_RDWR
                                        | RT_DEVICE_FLAG_INT_RX
-                                       //| RT_DEVICE_FLAG_INT_TX
+                                       | RT_DEVICE_FLAG_INT_TX
                                        , uart);
         RT_ASSERT(result == RT_EOK);
     }
+		
+//		/* 查找串口1设备 */
+//		serial = rt_device_find(RT_CONSOLE_DEVICE_NAME);
+
+//		/* 修改串口1配置参数 */
+//		config.baud_rate = BAUD_RATE_9600;        //修改波特率为 9600
+//		config.data_bits = DATA_BITS_8;           //数据位 8
+//		config.stop_bits = STOP_BITS_1;           //停止位 1
+//		config.bufsz     = 1024;                   //修改缓冲区 buff size 为 128
+//		config.parity    = PARITY_NONE;           //无奇偶校验位
+//		
+//		/* 控制串口设备。通过控制接口传入命令控制字，与控制参数 */
+//		rt_device_control(serial, RT_DEVICE_CTRL_CONFIG, &config);
+//		
+//		/* 打开串口设备。以中断接收及轮询发送模式打开串口设备 */
+//		rt_device_open(serial, RT_DEVICE_FLAG_INT_RX);
 
     return result;
 }
@@ -754,10 +750,6 @@ int rt_usart1_receive(void)
 	
 	if(usart1_rec_length > 0)
 	{
-		for(uint16_t i=0;i<usart1_rec_length;i++)
-		{
-			usart1_rec_buff[i] = usart_rx_fifo->buffer[i];
-		}
 		ret = RT_EOK;
 	}
 	else

@@ -188,6 +188,8 @@ extern uint8_t thread_socket_flag;
 extern uint8_t usart1_rec_buff[1024];
 extern uint16_t usart1_rec_length;
 
+extern uint8_t find_usart1_date_flag;
+
 /* multimedia packages */
 //UART_HandleTypeDef  huart1
 //UART_HandleTypeDef  huart2

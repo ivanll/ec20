@@ -15,6 +15,7 @@
 #include <stm32f4xx.h>
 #include "drv_common.h"
 #include "drv_gpio.h"
+#include "drv_timer.h"
 
 #ifdef __cplusplus
 extern "C" {

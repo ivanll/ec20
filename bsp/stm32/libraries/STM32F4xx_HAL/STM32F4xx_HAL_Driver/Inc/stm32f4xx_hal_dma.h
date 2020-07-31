@@ -132,7 +132,7 @@ typedef enum
   HAL_DMA_XFER_ABORT_CB_ID        = 0x05U,  /*!< Abort             */
   HAL_DMA_XFER_ALL_CB_ID          = 0x06U   /*!< All               */
 }HAL_DMA_CallbackIDTypeDef;
-
+#include "stm32f4xx_hal_def.h"
 /** 
   * @brief  DMA handle Structure definition
   */

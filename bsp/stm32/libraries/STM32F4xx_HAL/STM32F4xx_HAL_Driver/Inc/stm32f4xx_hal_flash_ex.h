@@ -719,7 +719,7 @@ typedef struct
 /** @addtogroup FLASHEx_Exported_Functions
   * @{
   */
-
+#include "stm32f4xx_hal_def.h"
 /** @addtogroup FLASHEx_Exported_Functions_Group1
   * @{
   */

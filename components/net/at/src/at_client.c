@@ -467,7 +467,7 @@ rt_size_t at_client_obj_recv(at_client_t client, char *buf, rt_size_t size, rt_i
 {
     rt_size_t read_idx = 0;
     rt_err_t result = RT_EOK;
-		struct at_socket  *soketf;
+
     char ch;
 
     RT_ASSERT(buf);
@@ -499,7 +499,7 @@ rt_size_t at_client_obj_recv(at_client_t client, char *buf, rt_size_t size, rt_i
 
 #ifdef AT_PRINT_RAW_CMD
 		
-    at_print_raw_cmd("urc_recv", buf, size);
+   // at_print_raw_cmd("urc_recv", buf, size);
 
 		//在此处设置接收事件标志位
 #endif

@@ -6739,7 +6739,7 @@ typedef struct
 /** @addtogroup RCCEx_Exported_Functions
   *  @{
   */
-
+#include "stm32f4xx_hal_def.h"
 /** @addtogroup RCCEx_Exported_Functions_Group1
   *  @{
   */

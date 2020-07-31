@@ -1241,7 +1241,7 @@ typedef struct
  /** @addtogroup RCC_Exported_Functions
   * @{
   */
-
+#include "stm32f4xx_hal_def.h"
 /** @addtogroup RCC_Exported_Functions_Group1
   * @{
   */

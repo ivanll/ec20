@@ -22,6 +22,7 @@
 #include "sal_socket.h"
 #include "uart_config.h"
 #include "paho_mqtt.h"
+#include "mb.h"
 
 
 UART_HandleTypeDef  huart1;
@@ -435,16 +436,14 @@ void thread_clent_3_entry(void* parameter)
 									closesocket(sockfd);
 									break;
 								}
-								
 								//
-		
 							}
 						}
 		
 				}
 				//未接收到事件标志，释放互斥量，延时一段时间等待其他事件进入
 				rt_mutex_release(sim_contect_mutex);
-				rt_thread_delay(200);
+				//rt_thread_delay(200);
 	
 				
 		}
@@ -458,6 +457,8 @@ int main(void)
 	  rt_err_t result;
 	  rt_event_t ret;
 	
+		//modbus();
+		time_config();
 		/* 创建一个动态信号量，初始值是 1 */
 		//用来抢占usart2的使用权
     usart2_sem = rt_sem_create("dsem", 1, RT_IPC_FLAG_FIFO);
@@ -488,7 +489,8 @@ int main(void)
         rt_kprintf("init event failed.\n");
         return -1;
     }
-
+		
+		
 //		/* 初始化 clent 1 thread */
 //		result = rt_thread_init(&thread_clent1,
 //														"clent1",
