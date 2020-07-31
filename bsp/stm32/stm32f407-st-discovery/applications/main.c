@@ -30,7 +30,8 @@ UART_HandleTypeDef  huart3;
 UART_HandleTypeDef  huart6;
 
 /* 指向信号量的指针 */
-rt_sem_t sim7600_sem = RT_NULL;
+rt_sem_t usart2_sem = RT_NULL;
+rt_sem_t usart1_sem = RT_NULL;
 /* 指向互斥量的指针 */
 rt_mutex_t sim_contect_mutex = RT_NULL;
 
@@ -209,21 +210,29 @@ void thread_clent_2_entry(void* parameter)
 				}
 				rt_mutex_release(sim_contect_mutex);
 				
+				rt_mutex_take(sim_contect_mutex, RT_WAITING_FOREVER);
+				//可以进行互相通信，存在问题，串口数据帧的区分
 				while(1)
 				{
 						
-						while(rt_event_recv(&event, EVENT_FLAG_port1,
+						if(rt_event_recv(&event, EVENT_FLAG_port1,
                 RT_EVENT_FLAG_AND | RT_EVENT_FLAG_CLEAR,
                 RT_WAITING_FOREVER, &e) == RT_EOK)
 						{
 
-							rt_mutex_take(sim_contect_mutex, RT_WAITING_FOREVER);
+							//在这需要获取串口的使用权，只有当通讯结束之后才释放串口，（串口1和串口2 均需要）
+							
+							//获得串口的使用权
+							rt_sem_take(usart1_sem,RT_WAITING_FOREVER);
+							rt_sem_take(usart2_sem,RT_WAITING_FOREVER);
+							
 							//rt_kprintf("enter port1_2 enent success!");
-							ret = recv(sockfd,recvbuf,128,0);
+							ret = recv(sockfd,recvbuf,512,0);
 							if(ret < 0)
 							{
 								/* 关闭连接 */
 								closesocket(sockfd);
+				
 								break;
 							}
 							else
@@ -234,6 +243,7 @@ void thread_clent_2_entry(void* parameter)
 								if(ret < 0)
 								{
 									closesocket(sockfd);
+					
 									break;
 								}
 								
@@ -257,6 +267,7 @@ void thread_clent_2_entry(void* parameter)
 										if(ret < 0)
 										{
 											closesocket(sockfd);
+											
 											break;
 										}
 										usart1_rec_length = 0;
@@ -265,26 +276,25 @@ void thread_clent_2_entry(void* parameter)
 								}
 								else
 								{
-									//超时返回超时错误
+									//超时返回超时错误  串口返回数据超时
+									/* 关闭连接 */
+									closesocket(sockfd);
+									break;
 								}
 								
 								//
-								
-								
+			
 							}
 						}
-						//else   //未接收到接收事件标志，且发生超时事件  返回超时错误
-						{
-							//未接收到事件标志，释放互斥量，延时一段时间等待其他事件进入
-							rt_mutex_release(sim_contect_mutex);
-							rt_thread_delay(200);
-						}
-						
-						
-						
+						rt_sem_release(usart1_sem);
+						rt_sem_release(usart2_sem);
 				}
-			
-				
+				//释放信号量和互斥量
+				rt_mutex_release(sim_contect_mutex);
+//				rt_sem_release(usart1_sem);
+//				rt_sem_release(usart2_sem);
+				rt_thread_delay(200);
+
 		}
 
 		
@@ -360,24 +370,19 @@ void thread_clent_3_entry(void* parameter)
 				}
 				rt_mutex_release(sim_contect_mutex);
 
-				
+				rt_mutex_take(sim_contect_mutex, RT_WAITING_FOREVER);
 				while(1)
 				{
 						
-					
-//						//发送数据
-//						ret = send(sockfd,data,rt_strlen(data),0);
-//					  if(ret < 0)
-//						{
-//							closesocket(sockfd);
-//							break;
-//						}
-					  while(rt_event_recv(&event, EVENT_FLAG_port2,
+					  if(rt_event_recv(&event, EVENT_FLAG_port2,
                 RT_EVENT_FLAG_AND | RT_EVENT_FLAG_CLEAR,
                 RT_WAITING_FOREVER, &e) == RT_EOK)
 						{
 
-							rt_mutex_take(sim_contect_mutex, RT_WAITING_FOREVER);
+							//获得串口的使用权
+							rt_sem_take(usart1_sem,RT_WAITING_FOREVER);
+							rt_sem_take(usart2_sem,RT_WAITING_FOREVER);
+							
 							//rt_kprintf("enter port1_2 enent success!");
 							ret = recv(sockfd,recvbuf,128,0);
 							if(ret < 0)
@@ -426,22 +431,21 @@ void thread_clent_3_entry(void* parameter)
 								else
 								{
 									//超时返回超时错误
+									/* 关闭连接 */
+									closesocket(sockfd);
+									break;
 								}
 								
 								//
-								
-								
+		
 							}
 						}
-						//else   //未接收到接收事件标志，且发生超时事件  返回超时错误
-						{
-							//未接收到事件标志，释放互斥量，延时一段时间等待其他事件进入
-							rt_mutex_release(sim_contect_mutex);
-							rt_thread_delay(200);
-						}
+		
 				}
-			
-				
+				//未接收到事件标志，释放互斥量，延时一段时间等待其他事件进入
+				rt_mutex_release(sim_contect_mutex);
+				rt_thread_delay(200);
+	
 				
 		}
 
@@ -455,8 +459,16 @@ int main(void)
 	  rt_event_t ret;
 	
 		/* 创建一个动态信号量，初始值是 1 */
-    sim7600_sem = rt_sem_create("dsem", 1, RT_IPC_FLAG_FIFO);
-    if (sim7600_sem == RT_NULL)
+		//用来抢占usart2的使用权
+    usart2_sem = rt_sem_create("dsem", 1, RT_IPC_FLAG_FIFO);
+    if (usart2_sem == RT_NULL)
+    {
+        rt_kprintf("create dynamic semaphore failed.\n");
+				return -1;
+    }
+		//用来抢占usart1的使用权
+		usart1_sem = rt_sem_create("dsem", 1, RT_IPC_FLAG_FIFO);
+    if (usart2_sem == RT_NULL)
     {
         rt_kprintf("create dynamic semaphore failed.\n");
 				return -1;
