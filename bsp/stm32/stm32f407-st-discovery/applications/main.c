@@ -38,13 +38,11 @@ rt_mutex_t sim_contect_mutex = RT_NULL;
 
 /* 事件控制块 */
 struct rt_event event;
-		/* 线程句柄声明*/
-//static struct rt_thread thread_clent1;
-//static struct rt_thread thread_clent2;
+/* 线程句柄声明*/
+static struct rt_thread thread_usart1;
 
 /* 线程堆栈声明 */
-//static rt_uint8_t thread_clent1_stack[ 2048 ];
-//static rt_uint8_t thread_clent2_stack[ 2048 ];
+static rt_uint8_t thread_usart1_stack[ 2048 ];
 #define SERVER_HOST_1   "106.13.60.139"
 #define SERVER_PORT_1   8000
 
@@ -406,14 +404,15 @@ void thread_clent_3_entry(void* parameter)
 								//通过串口将数据发送出去
 							  rt_usart1_sendbuff((uint8_t *)recvbuf);
 								
-								//等待RTU返回的数据
-								if(rt_event_recv(&event, EVENT_FLAG_usart1,
+								//等待RTU返回的数据  c串口接收到数据经过判断
+								if(rt_event_recv(&event, EVENT_FLAG_usart_clent1,
                 RT_EVENT_FLAG_AND | RT_EVENT_FLAG_CLEAR,
                 RT_WAITING_FOREVER, &e) == RT_EOK)//调试时更改为  RT_WAITING_FOREVER
 								{
 									//处理返回数据 数据接收成功则发送数据到服务器
 									//rt_kprintf("enter rtu date receive event success!");
 									ret = rt_usart1_receive();
+									
 									if(ret == RT_EOK)
 									{
 										//将返回数据发送到服务器
@@ -426,6 +425,10 @@ void thread_clent_3_entry(void* parameter)
 											break;
 										}
 										usart1_rec_length = 0;
+										for(uint16_t i=0;usart1_rec_buff[i] == '\0';i++)
+										{
+											usart1_rec_buff[i] = 0;
+										}
 									}
 									
 								}
@@ -489,21 +492,23 @@ int main(void)
         rt_kprintf("init event failed.\n");
         return -1;
     }
-		
-		
-//		/* 初始化 clent 1 thread */
-//		result = rt_thread_init(&thread_clent1,
-//														"clent1",
-//														thread_clent_1_entry, 
-//														RT_NULL,
-//														(rt_uint8_t*)&thread_clent1_stack[0], 
-//														sizeof(thread_clent1_stack), 
-//														30, 
-//														5);
-//		if (result == RT_EOK)
-//		{
-//				rt_thread_startup(&thread_clent1);
-//		}
+	/* 初始化 usart1 thread 用来进行数据处理*/
+		result = rt_thread_init(&thread_usart1,
+														"clent2",
+														thread_usart1_entry, 
+														RT_NULL,
+														(rt_uint8_t*)&thread_usart1_stack[0], 
+														sizeof(thread_usart1_stack), 
+														30, 
+														5);
+		if (result == RT_EOK)
+		{
+				rt_thread_startup(&thread_usart1);
+		}
+		else
+		{
+			rt_kprintf("usart1_thread  error\r\n");
+		}
 //		
 //		/* 初始化 clent 2 thread */
 //		result = rt_thread_init(&thread_clent2,
@@ -518,6 +523,6 @@ int main(void)
 //		{
 //				rt_thread_startup(&thread_clent2);
 //		}
-    else
-        return -1;
+//    else
+//        return -1;
 }

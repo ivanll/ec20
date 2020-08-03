@@ -321,7 +321,7 @@ extern "C" {
 
 void rt_usart1_sendbuff(uint8_t *sendbuff );
 int rt_usart1_receive(void);
-
+void thread_usart1_entry(void* parameter);
 
 
 #ifdef __cplusplus
