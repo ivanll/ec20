@@ -34,26 +34,24 @@ void HAL_TIM_Base_MspInit(TIM_HandleTypeDef *htim)
 			//HAL_NVIC_EnableIRQ(TIM2_IRQn);          //开启ITM3中断   
 		}
 }
-uint8_t count = 0;
+uint16_t count = 0;
 uint8_t count_sec = 0;
 //定时器2中断服务函数
 void TIM2_IRQHandler(void)
 {
-		//__HAL_TIM_CLEAR_FLAG(&TIM2_Handler,TIM_FLAG_UPDATE);
+
 		count++;
-		if(count == 1)
+		if(count ==5000)
 		{
-			count_sec++;
-			if(count_sec == 1)
-			{
 				stop_timer();
 				
-				//数据接收完成 发送事件标志
-				rt_event_send(&event,EVENT_FLAG_usart1);
-				
 				count = 0;
-				count_sec = 0;
-			}
+
+				//数据接收完成 发送事件标志
+				if(usart1_rec_length > 0)
+				{
+					rt_event_send(&event,EVENT_FLAG_usart1);
+				}
 		}
 
 }

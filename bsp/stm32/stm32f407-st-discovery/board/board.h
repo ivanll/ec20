@@ -38,6 +38,9 @@ extern int __bss_end;
 #define HEAP_END        STM32_SRAM_END
 
 void SystemClock_Config(void);
+int _modbus_rtu_send_msg_pre(uint8_t *req, int req_length);
+uint16_t modbus_crc16(uint8_t *buffer, uint16_t buffer_length);
+int _modbus_rtu_check_integrity(uint8_t *msg,  const int msg_length);
 
 #ifdef __cplusplus
 }

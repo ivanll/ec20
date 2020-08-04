@@ -64,7 +64,7 @@ int connest_01_socket = 100;
 int connest_02_socket = 100;
 
 uint8_t usart1_rec_buff[1024] = {0};
-uint16_t usart1_rec_length = 0;
+ uint16_t usart1_rec_length = 0;
 
 uint8_t thread_socket_flag;
 
@@ -210,89 +210,78 @@ void thread_clent_2_entry(void* parameter)
 				rt_mutex_release(sim_contect_mutex);
 				
 				rt_mutex_take(sim_contect_mutex, RT_WAITING_FOREVER);
-				//可以进行互相通信，存在问题，串口数据帧的区分
 				while(1)
 				{
 						
-						if(rt_event_recv(&event, EVENT_FLAG_port1,
+					  if(rt_event_recv(&event, EVENT_FLAG_port1,
                 RT_EVENT_FLAG_AND | RT_EVENT_FLAG_CLEAR,
                 RT_WAITING_FOREVER, &e) == RT_EOK)
 						{
 
-							//在这需要获取串口的使用权，只有当通讯结束之后才释放串口，（串口1和串口2 均需要）
-							
 							//获得串口的使用权
 							rt_sem_take(usart1_sem,RT_WAITING_FOREVER);
 							rt_sem_take(usart2_sem,RT_WAITING_FOREVER);
 							
 							//rt_kprintf("enter port1_2 enent success!");
-							ret = recv(sockfd,recvbuf,512,0);
+							ret = recv(sockfd,recvbuf,1024,0);
 							if(ret < 0)
 							{
 								/* 关闭连接 */
 								closesocket(sockfd);
-				
 								break;
 							}
 							else
 							{
 								//rt_kprintf(" thread_01 receive date = %s\r\n",recvbuf);
-								//发送数据
+								//发送数据  测试使用  
 								ret = send(sockfd,data,rt_strlen(data),0);
 								if(ret < 0)
 								{
 									closesocket(sockfd);
-					
 									break;
 								}
 								
-								//通过串口将数据发送出去
-							  rt_usart1_sendbuff((uint8_t *)recvbuf);
+								//通过串口将数据发送出去  此处需要将数据进行打包成modbus数据包
+							  rt_usart1_sendbuff((uint8_t *)recvbuf,rt_strlen(recvbuf));
 								
-								//等待RTU返回的数据
-								if(rt_event_recv(&event, EVENT_FLAG_usart1,
+								//等待RTU返回的数据  串口接收到数据经过判断后设置事件标志
+								if(rt_event_recv(&event, EVENT_FLAG_usart_clent2,
                 RT_EVENT_FLAG_AND | RT_EVENT_FLAG_CLEAR,
                 RT_WAITING_FOREVER, &e) == RT_EOK)//调试时更改为  RT_WAITING_FOREVER
 								{
 									//处理返回数据 数据接收成功则发送数据到服务器
-									//rt_kprintf("enter rtu date receive event success!");
-									ret = rt_usart1_receive();
-									if(ret == RT_EOK)
+
+									//发送数据  将串口接收到的数据发送到服务器
+									ret = send(sockfd,usart1_rec_buff,usart1_rec_length,0);
+									if(ret < 0)
 									{
-										//将返回数据发送到服务器
-										//发送数据
-										ret = send(sockfd,usart1_rec_buff,usart1_rec_length,0);
-										//ret = send(sockfd,data,rt_strlen(data),0);
-										if(ret < 0)
-										{
-											closesocket(sockfd);
-											
-											break;
-										}
-										usart1_rec_length = 0;
+										closesocket(sockfd);
+										break;
 									}
+									//发送成功后将缓冲区清零
+									usart1_rec_length = 0;
+									for(uint16_t i=0;usart1_rec_buff[i] == '\0';i++)
+									{
+										usart1_rec_buff[i] = 0;
+									}
+									
 									
 								}
 								else
 								{
-									//超时返回超时错误  串口返回数据超时
+									//超时返回超时错误  返回错误代码
+									
 									/* 关闭连接 */
 									closesocket(sockfd);
 									break;
 								}
-								
 								//
-			
 							}
 						}
-						rt_sem_release(usart1_sem);
-						rt_sem_release(usart2_sem);
+		
 				}
-				//释放信号量和互斥量
+				//未接收到事件标志，释放互斥量，延时一段时间等待其他事件进入
 				rt_mutex_release(sim_contect_mutex);
-//				rt_sem_release(usart1_sem);
-//				rt_sem_release(usart2_sem);
-				rt_thread_delay(200);
 
 		}
 
@@ -402,39 +391,35 @@ void thread_clent_3_entry(void* parameter)
 								}
 								
 								//通过串口将数据发送出去
-							  rt_usart1_sendbuff((uint8_t *)recvbuf);
+							  rt_usart1_sendbuff((uint8_t *)recvbuf,rt_strlen(recvbuf));
 								
 								//等待RTU返回的数据  c串口接收到数据经过判断
-								if(rt_event_recv(&event, EVENT_FLAG_usart_clent1,
+								if(rt_event_recv(&event, EVENT_FLAG_usart_clent3,
                 RT_EVENT_FLAG_AND | RT_EVENT_FLAG_CLEAR,
                 RT_WAITING_FOREVER, &e) == RT_EOK)//调试时更改为  RT_WAITING_FOREVER
 								{
 									//处理返回数据 数据接收成功则发送数据到服务器
-									//rt_kprintf("enter rtu date receive event success!");
-									ret = rt_usart1_receive();
+									//将返回数据发送到服务器
+									//发送数据
+									ret = send(sockfd,usart1_rec_buff,usart1_rec_length,0);
 									
-									if(ret == RT_EOK)
+									if(ret < 0)
 									{
-										//将返回数据发送到服务器
-										//发送数据
-										ret = send(sockfd,usart1_rec_buff,usart1_rec_length,0);
-										//ret = send(sockfd,data,rt_strlen(data),0);
-										if(ret < 0)
-										{
-											closesocket(sockfd);
-											break;
-										}
-										usart1_rec_length = 0;
-										for(uint16_t i=0;usart1_rec_buff[i] == '\0';i++)
-										{
-											usart1_rec_buff[i] = 0;
-										}
+										closesocket(sockfd);
+										break;
 									}
+									usart1_rec_length = 0;
+									for(uint16_t i=0;usart1_rec_buff[i] == '\0';i++)
+									{
+										usart1_rec_buff[i] = 0;
+									}
+									
 									
 								}
 								else
 								{
-									//超时返回超时错误
+									//超时返回超时错误  返回错误代码
+									
 									/* 关闭连接 */
 									closesocket(sockfd);
 									break;
@@ -460,7 +445,7 @@ int main(void)
 	  rt_err_t result;
 	  rt_event_t ret;
 	
-		//modbus();
+
 		time_config();
 		/* 创建一个动态信号量，初始值是 1 */
 		//用来抢占usart2的使用权
@@ -509,20 +494,5 @@ int main(void)
 		{
 			rt_kprintf("usart1_thread  error\r\n");
 		}
-//		
-//		/* 初始化 clent 2 thread */
-//		result = rt_thread_init(&thread_clent2,
-//														"clent2",
-//														thread_clent_2_entry, 
-//														RT_NULL,
-//														(rt_uint8_t*)&thread_clent2_stack[0], 
-//														sizeof(thread_clent2_stack), 
-//														30, 
-//														5);
-//		if (result == RT_EOK)
-//		{
-//				rt_thread_startup(&thread_clent2);
-//		}
-//    else
-//        return -1;
+
 }

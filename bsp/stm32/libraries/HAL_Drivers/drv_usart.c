@@ -16,8 +16,22 @@
 
 uint8_t find_usart1_date_flag = 0;
 
+static uint16_t usart1_count = 0;
+
+typedef  struct _config_info_{
+    uint8_t ID[2];   
+    uint8_t date[12];
+    uint8_t time[12];
+}__attribute__((packed)) config_info_t;
 
 
+const  config_info_t config_info __attribute__((section(".ARM.__AT_0x080f0000")))={
+	
+    .ID = 0X0A,
+    .date    = __DATE__,
+    .time    = __TIME__, 
+    
+};
 
 
 #ifdef RT_USING_SERIAL
@@ -54,6 +68,7 @@ uint8_t find_usart1_date_flag = 0;
 #elif defined(SOC_SERIES_STM32F7) || defined(SOC_SERIES_STM32F0) || defined(SOC_SERIES_STM32H7)
 #define UART_INSTANCE_CLEAR_FUNCTION    __HAL_UART_CLEAR_IT
 #endif
+
 
 
 /* stm32 config class */
@@ -473,30 +488,6 @@ static int stm32_getc(struct rt_serial_device *serial)
     return ch;
 }
 
-static rt_size_t stm32_dma_transmit(struct rt_serial_device *serial, rt_uint8_t *buf, rt_size_t size, int direction)
-{
-    struct stm32_uart *uart;
-    RT_ASSERT(serial != RT_NULL);
-    uart = rt_container_of(serial, struct stm32_uart, serial);
-
-    if (size == 0)
-    {
-        return 0;
-    }
-
-    if (RT_SERIAL_DMA_TX == direction)
-    {
-        if (HAL_UART_Transmit_DMA(&uart->handle, buf, size) == HAL_OK)
-        {
-            return size;
-        }
-        else
-        {
-            return 0;
-        }
-    }
-    return 0;
-}
 
 static const struct rt_uart_ops stm32_uart_ops =
 {
@@ -585,7 +576,7 @@ void USART1_IRQHandler(void)
 
 	  //重启定时器
 		restart_timer();
-	
+		
 		RT_ASSERT(serial != RT_NULL);
 		uart = rt_container_of(serial, struct stm32_uart, serial);
 
@@ -594,8 +585,13 @@ void USART1_IRQHandler(void)
 						(__HAL_UART_GET_IT_SOURCE(&(uart->handle), UART_IT_RXNE) != RESET))
 		{
 			  
-				usart1_rec_buff[usart1_rec_length++] = uart->handle.Instance->DR & 0xff;
+				usart1_rec_buff[usart1_count] = uart->handle.Instance->DR & 0xff;
+				
 		}
+
+		usart1_count++;
+		
+		usart1_rec_length = usart1_count;
 		
 		__HAL_UART_CLEAR_FLAG(&(uart->handle), UART_FLAG_RXNE);
 
@@ -648,11 +644,6 @@ void USART6_IRQHandler(void)
 #endif /* BSP_USING_UART5*/
 
 
-
-
-
-
-
 /**
   * @brief  UART error callbacks
   * @param  huart: UART handle
@@ -675,7 +666,6 @@ int rt_hw_usart_init(void)
     struct serial_configure config = RT_SERIAL_CONFIG_DEFAULT;
     rt_err_t result = 0;
 		struct stm32_uart *uart;
-		static rt_device_t serial;                /* 串口设备句柄 */
 
 
     for (int i = 0; i < obj_num; i++)
@@ -698,44 +688,28 @@ int rt_hw_usart_init(void)
 }
 
 
-//串口1 发送数据
-void rt_usart1_sendbuff(uint8_t *sendbuff )
+//串口1 发送数据  将数据打包成modbus数据包后进行发送
+void rt_usart1_sendbuff(uint8_t *sendbuff,uint16_t date_length )
 {
-		struct stm32_uart *uart;
 	  struct rt_serial_device *serial = &(uart_obj[UART1_INDEX].serial);
-	 
+	
     RT_ASSERT(serial != RT_NULL);
-
+		
 		rt_interrupt_enter();
-		/* 串口发送标志位为空 -------------------------------------------------*/
-   
-		for(uint8_t i=0;sendbuff[i] != '\0';i++)
+		
+		//进行modbus数据打包
+		_modbus_rtu_send_msg_pre(sendbuff,date_length);
+		//发送数据
+		for(uint8_t i=0;i<date_length;i++)
 		{
 			stm32_putc(serial, sendbuff[i]);
 		}
+		date_length = 0;
 
     /* leave interrupt */
     rt_interrupt_leave();
 }
 
-int rt_usart1_receive(void)
-{
-	int ret;
-	struct rt_serial_device *serial = &(uart_obj[UART1_INDEX].serial);
-	
-	struct rt_serial_rx_fifo* usart_rx_fifo;
-	
-	
-	if(usart1_rec_length > 0)
-	{
-		ret = RT_EOK;
-	}
-	else
-	{
-		ret = RT_ERROR;
-	}
-	return ret;
-}
 
 
 
@@ -743,7 +717,13 @@ int rt_usart1_receive(void)
 void thread_usart1_entry(void* parameter)
 {
 	rt_uint32_t e;
+	uint8_t broadcast_rx[8]={0x00, 0x08, 0x10, 0x04, 0x28, 0x10,0x00, 0x00};
+	struct rt_serial_device *serial = &(uart_obj[UART1_INDEX].serial);
 	
+	struct stm32_uart *uart;
+	RT_ASSERT(serial != RT_NULL);
+
+  uart = rt_container_of(serial, struct stm32_uart, serial);
 	//等待RTU返回的数据
 	while(1)
 	{
@@ -751,35 +731,79 @@ void thread_usart1_entry(void* parameter)
 		RT_EVENT_FLAG_AND | RT_EVENT_FLAG_CLEAR,
 		RT_WAITING_FOREVER, &e) == RT_EOK)//调试时更改为  RT_WAITING_FOREVER
 		{
-			if(usart1_rec_length == 1)//接收到数据
+			usart1_count = 0;
+			
+			if(usart1_rec_length > 0)//接收到数据
 			{
-				//对数据进行处理
-				rt_usart1_sendbuff(usart1_rec_buff);
 				
-				//判断是给哪个服务器的数据
-				if(usart1_rec_buff[0] == 0x01)
+				//进行数据校验  
+				if(_modbus_rtu_check_integrity(&usart1_rec_buff[0],  usart1_rec_length)==usart1_rec_length)
 				{
-					//数据接收完成 发送事件标志
-					rt_event_send(&event,EVENT_FLAG_usart_clent1);
+
+					//对数据进行处理
+					rt_usart1_sendbuff(usart1_rec_buff,usart1_rec_length);//调试时使用
+					
+					
+					
+					//判断是给哪个服务器的数据
+					if(usart1_rec_buff[0] == 0x01)
+					{
+						//数据接收完成 发送事件标志
+						rt_event_send(&event,EVENT_FLAG_usart_clent1);
+						
+					}
+					
+					//判断是给哪个服务器的数据
+					if(usart1_rec_buff[0] == 0x02)
+					{
+						//数据接收完成 发送事件标志
+						rt_event_send(&event,EVENT_FLAG_usart_clent2);
+						
+					}
+					
+					//判断是给哪个服务器的数据
+					if(usart1_rec_buff[0] == 0x03)
+					{
+						//数据接收完成 发送事件标志
+						rt_event_send(&event,EVENT_FLAG_usart_clent3);
+						
+					}
+					
+					//当ID为0X0A时说明是RTU发送给自己的配置信息
+					if(usart1_rec_buff[0] == 0x0A)
+					{
+						//校验成功将配置信息更新并保存  进行配置更新时应该对串口2进行互斥处理
+						
+						
+						//返回接收完成应答
+						
+	
+					}
+					//清除数据   测试使用
+					
+					for(uint16_t i=0;i<usart1_rec_length;i++)
+					{
+						usart1_rec_buff[i] = 0;
+					}
+					usart1_rec_length = 0; 
 				}
-				
-				//获取数据长度
-				usart1_rec_length = rt_strnlen((const char *)usart1_rec_buff,2048);
-				rt_kprintf(" usart1_rec_length receive date = %d\r\n",usart1_rec_length);
-				//清除数据
-//				usart1_rec_length = 0; 
-//				for(uint16_t i=0;usart1_rec_buff[i] == '\0';i++)
-//				{
-//					usart1_rec_buff[i] = 0;
-//				}
+				else
+				{
+					//数据校验错误  返回错误代码
+					for(uint16_t i=0;i<usart1_rec_length;i++)
+					{
+						usart1_rec_buff[i] = 0;
+					}
+					usart1_rec_length = 0;
+				}
 			}
 			else//数据无效
 			{
-				usart1_rec_length = 0; 
-				for(uint16_t i=0;usart1_rec_buff[i] == '\0';i++)
+				for(uint16_t i=0;i<usart1_rec_length;i++)
 				{
 					usart1_rec_buff[i] = 0;
 				}
+				usart1_rec_length = 0; 
 			}
 		}
 	}

@@ -319,7 +319,7 @@ extern "C" {
 #endif /* BSP_USING_UART8 */
 
 
-void rt_usart1_sendbuff(uint8_t *sendbuff );
+void rt_usart1_sendbuff(uint8_t *sendbuff,uint16_t date_length );
 int rt_usart1_receive(void);
 void thread_usart1_entry(void* parameter);
 

@@ -205,6 +205,8 @@ extern struct rt_event event;
 #define EVENT_FLAG_port1  (1 << 5)
 #define EVENT_FLAG_port2  (1 << 6)
 #define EVENT_FLAG_usart1 (1 << 7)
+#define EVENT_FLAG_usart_clent2   (1 << 8)
+#define EVENT_FLAG_usart_clent3   (1 << 9)
 
 /* system packages */
 
