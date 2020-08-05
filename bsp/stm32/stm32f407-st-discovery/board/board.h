@@ -16,6 +16,7 @@
 #include "drv_common.h"
 #include "drv_gpio.h"
 #include "drv_timer.h"
+#include "drv_flash.h"
 
 #ifdef __cplusplus
 extern "C" {

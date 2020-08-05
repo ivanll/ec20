@@ -42,13 +42,30 @@ struct rt_event event;
 static struct rt_thread thread_usart1;
 
 /* 线程堆栈声明 */
-static rt_uint8_t thread_usart1_stack[ 2048 ];
+static rt_uint8_t thread_usart1_stack[ 4096 ];
 #define SERVER_HOST_1   "106.13.60.139"
 #define SERVER_PORT_1   8000
 
 #define SERVER_HOST_2   "106.13.60.139"
 #define SERVER_PORT_2   8090
 
+char *serve1_ip = "106.13.60.139";
+uint16_t serve1_port = 8000;
+
+char *serve2_ip = "106.13.60.139";
+uint16_t serve2_port = 8090;
+
+char *mqtt1_uri = "tcp://106.13.60.139:1883";
+char *mqtt1_usename = "admin";
+char *mqtt1_password = "admin";
+char *mqtt1_subtopic = "/mqtt/test";
+char *mqtt1_pubtopic = "/mqtt/test";
+
+char *mqtt2_uri = "tcp://106.13.60.139:1883";
+char *mqtt2_usename = "admin";
+char *mqtt2_password = "admin";
+char *mqtt2_subtopic = "/mqtt/test_02";
+char *mqtt2_pubtopic = "/mqtt/test_02";
 
 #define MQTT_URI                "tcp://106.13.60.139:1883"
 #define MQTT_USERNAME           "admin"
@@ -64,15 +81,9 @@ int connest_01_socket = 100;
 int connest_02_socket = 100;
 
 uint8_t usart1_rec_buff[1024] = {0};
- uint16_t usart1_rec_length = 0;
+uint16_t usart1_rec_length = 0;
 
 uint8_t thread_socket_flag;
-
-
-
-
-///* define MQTT client context */
-//static MQTTClient client;
 
 
 
@@ -87,9 +98,6 @@ void thread_clent_1_entry(void* parameter)
 	
 		int ret = -1;
 		char *rsp;
-		static char senddate[] = "hello!";
-		static char sendbuff[] = "rt_thread!";
-
 		
    	while(1)
 		{
@@ -144,7 +152,6 @@ void thread_clent_2_entry(void* parameter)
 {
 		int ret;
 		char recvbuf[128] = {0};
-		uint8_t buffdate[128] = {1,2,3,4,5,6,7,8,9,11};
 		char data[20] = "nice to meet you!";
 		int sockfd = -1;
 		rt_uint32_t e;
@@ -152,10 +159,6 @@ void thread_clent_2_entry(void* parameter)
     struct sockaddr_in server_addr;
     struct netdev *netdev = RT_NULL; 
 		
-		struct at_socket *socket_01;
-		
-		
-	
 		while(1)
 		{
 				//获取互斥量
@@ -232,14 +235,14 @@ void thread_clent_2_entry(void* parameter)
 							}
 							else
 							{
-								//rt_kprintf(" thread_01 receive date = %s\r\n",recvbuf);
-								//发送数据  测试使用  
-								ret = send(sockfd,data,rt_strlen(data),0);
-								if(ret < 0)
-								{
-									closesocket(sockfd);
-									break;
-								}
+
+//								//发送数据  测试使用  
+//								ret = send(sockfd,data,rt_strlen(data),0);
+//								if(ret < 0)
+//								{
+//									closesocket(sockfd);
+//									break;
+//								}
 								
 								//通过串口将数据发送出去  此处需要将数据进行打包成modbus数据包
 							  rt_usart1_sendbuff((uint8_t *)recvbuf,rt_strlen(recvbuf));
@@ -271,8 +274,8 @@ void thread_clent_2_entry(void* parameter)
 								{
 									//超时返回超时错误  返回错误代码
 									
-									/* 关闭连接 */
-									closesocket(sockfd);
+									rt_sem_release(usart1_sem);
+									rt_sem_release(usart2_sem);
 									break;
 								}
 								//
@@ -301,9 +304,7 @@ void thread_clent_3_entry(void* parameter)
 		struct sockaddr_in client_addr;
     struct sockaddr_in server_addr;
     struct netdev *netdev = RT_NULL; 
-		uint8_t buffdate[128] = {1,2,3,4,5,6,7,8,9};
-		
-		struct at_socket *socket_02;
+
 	
 		while(1)
 		{
@@ -408,6 +409,7 @@ void thread_clent_3_entry(void* parameter)
 										closesocket(sockfd);
 										break;
 									}
+									
 									usart1_rec_length = 0;
 									for(uint16_t i=0;usart1_rec_buff[i] == '\0';i++)
 									{
@@ -419,17 +421,24 @@ void thread_clent_3_entry(void* parameter)
 								else
 								{
 									//超时返回超时错误  返回错误代码
-									
-									/* 关闭连接 */
-									closesocket(sockfd);
-									break;
+									rt_sem_release(usart1_sem);
+									rt_sem_release(usart2_sem);
+									//break;
+
 								}
 								//
 							}
 						}
+						else  //超时
+						{
+							rt_sem_release(usart1_sem);
+							rt_sem_release(usart2_sem);
+						}
 		
 				}
 				//未接收到事件标志，释放互斥量，延时一段时间等待其他事件进入
+				rt_sem_release(usart1_sem);
+				rt_sem_release(usart2_sem);
 				rt_mutex_release(sim_contect_mutex);
 				//rt_thread_delay(200);
 	
@@ -443,8 +452,6 @@ int main(void)
 {
     /* user app entry */
 	  rt_err_t result;
-	  rt_event_t ret;
-	
 
 		time_config();
 		/* 创建一个动态信号量，初始值是 1 */

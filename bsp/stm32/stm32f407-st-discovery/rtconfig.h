@@ -199,14 +199,15 @@ extern uint8_t find_usart1_date_flag;
 extern struct rt_event event;
 
 //事件标志
-#define EVENT_FLAG_usart_clent1   (1 << 2)
+
 #define EVENT_FLAG_usart2 (1 << 3)
 #define EVENT_FLAG_mqtt   (1 << 4)
 #define EVENT_FLAG_port1  (1 << 5)
 #define EVENT_FLAG_port2  (1 << 6)
 #define EVENT_FLAG_usart1 (1 << 7)
-#define EVENT_FLAG_usart_clent2   (1 << 8)
-#define EVENT_FLAG_usart_clent3   (1 << 9)
+#define EVENT_FLAG_usart_clent1   (1 << 8)
+#define EVENT_FLAG_usart_clent2   (1 << 9)
+#define EVENT_FLAG_usart_clent3   (1 << 10)
 
 /* system packages */
 

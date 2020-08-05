@@ -134,6 +134,8 @@ RT_WEAK void rt_hw_board_init()
     __set_PRIMASK(1);
 
     rt_hw_systick_init();
+		
+		FLASH_Init();
 
     /* Heap initialization */
 #if defined(RT_USING_HEAP)

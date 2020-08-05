@@ -41,7 +41,7 @@ void TIM2_IRQHandler(void)
 {
 
 		count++;
-		if(count ==5000)
+		if(count ==6000)
 		{
 				stop_timer();
 				

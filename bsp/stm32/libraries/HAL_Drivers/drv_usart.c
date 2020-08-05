@@ -18,19 +18,75 @@ uint8_t find_usart1_date_flag = 0;
 
 static uint16_t usart1_count = 0;
 
-typedef  struct _config_info_{
-    uint8_t ID[2];   
-    uint8_t date[12];
-    uint8_t time[12];
-}__attribute__((packed)) config_info_t;
 
-
-const  config_info_t config_info __attribute__((section(".ARM.__AT_0x080f0000")))={
+//这些地址从40000开始  modbus寄存器
+const  config_info_t config_info __attribute__((section(".ARM.__AT_0x08050000")))={
 	
     .ID = 0X0A,
-    .date    = __DATE__,
-    .time    = __TIME__, 
+		.rtu_id = 0x01,
+		
+		//初始化串口配置数据
+		.usart_config_t[0].usart_BaudRate = 115200,
+		.usart_config_t[0].usart_parity = 0,
+		.usart_config_t[0].usart_stopbits = 1,
+		.usart_config_t[0].usart_datebits = 8,
+	
+		.usart_config_t[1].usart_BaudRate = 115200,
+		.usart_config_t[1].usart_parity = 0,
+		.usart_config_t[1].usart_stopbits = 1,
+		.usart_config_t[1].usart_datebits = 8,
+	
+		.usart_config_t[2].usart_BaudRate = 115200,
+		.usart_config_t[2].usart_parity = 0,
+		.usart_config_t[2].usart_stopbits = 1,
+		.usart_config_t[2].usart_datebits = 8,
+	
+		.usart_config_t[3].usart_BaudRate = 115200,
+		.usart_config_t[3].usart_parity = 0,
+		.usart_config_t[3].usart_stopbits = 1,
+		.usart_config_t[3].usart_datebits = 8,
     
+    //初始化服务器配置数据
+		.clent_config_t[0].clent_id = 0x02,
+		.clent_config_t[0].clent_ip ="106.13.60.139",
+		.clent_config_t[0].clent_port = 8000,
+		
+		.clent_config_t[1].clent_id = 0x03,
+		.clent_config_t[1].clent_ip ="106.13.60.139",
+		.clent_config_t[1].clent_port = 8090,
+		
+		.clent_config_t[2].clent_id = 0x04,
+		.clent_config_t[2].clent_ip ="106.13.60.139",
+		.clent_config_t[2].clent_port = 8088,
+		
+		//初始化mqtt配置参数
+		.mqtt_config_t[0].mqtt_id = 0x05,
+		.mqtt_config_t[0].mqtt_uri = "tcp://106.13.60.139:1883",
+		.mqtt_config_t[0].mqtt_SUBTopicNAME = "/mqtt/test",
+		.mqtt_config_t[0].mqtt_PUBTopicNAME = "/mqtt/test",
+		.mqtt_config_t[0].mqtt_username = "admin",
+		.mqtt_config_t[0].mqtt_password = "admin",
+		
+		.mqtt_config_t[1].mqtt_id = 0x06,
+		.mqtt_config_t[1].mqtt_uri = "tcp://106.13.60.139:1883",
+		.mqtt_config_t[1].mqtt_SUBTopicNAME = "/mqtt/test",
+		.mqtt_config_t[1].mqtt_PUBTopicNAME = "/mqtt/test",
+		.mqtt_config_t[1].mqtt_username = "admin",
+		.mqtt_config_t[1].mqtt_password = "admin",
+		
+		.mqtt_config_t[2].mqtt_id = 0x07,
+		.mqtt_config_t[2].mqtt_uri = "tcp://106.13.60.139:1883",
+		.mqtt_config_t[2].mqtt_SUBTopicNAME = "/mqtt/test",
+		.mqtt_config_t[2].mqtt_PUBTopicNAME = "/mqtt/test",
+		.mqtt_config_t[2].mqtt_username = "admin",
+		.mqtt_config_t[2].mqtt_password = "admin",
+		
+		//初始化其他配置信息
+		.relink_time = 1000,
+		.heard_beat_time = 2000,
+		.timeout_tx = 1000,
+		.heard_beat_date = "asdasdasd",
+		
 };
 
 
@@ -666,10 +722,29 @@ int rt_hw_usart_init(void)
     struct serial_configure config = RT_SERIAL_CONFIG_DEFAULT;
     rt_err_t result = 0;
 		struct stm32_uart *uart;
-
-
+		//struct _config_info_ *info_config;
+	  //config_info_t info_config;
+	
+		//读取配置信息
+		//read_config();
+    
     for (int i = 0; i < obj_num; i++)
     {
+				if(i < 3)
+				{
+					config.baud_rate = config_info.usart_config_t[i].usart_BaudRate;
+					config.parity = config_info.usart_config_t[i].usart_parity;
+					config.data_bits = config_info.usart_config_t[i].usart_datebits;
+					config.stop_bits = config_info.usart_config_t[i].usart_stopbits;
+				}
+				if(i == 5)
+				{
+					config.baud_rate = config_info.usart_config_t[3].usart_BaudRate;
+					config.parity = config_info.usart_config_t[3].usart_parity;
+					config.data_bits = config_info.usart_config_t[3].usart_datebits;
+					config.stop_bits = config_info.usart_config_t[3].usart_stopbits;
+				}
+			  
         uart_obj[i].config = &uart_config[i];
         uart_obj[i].serial.ops    = &stm32_uart_ops;
         uart_obj[i].serial.config = config;
@@ -717,13 +792,21 @@ void rt_usart1_sendbuff(uint8_t *sendbuff,uint16_t date_length )
 void thread_usart1_entry(void* parameter)
 {
 	rt_uint32_t e;
-	uint8_t broadcast_rx[8]={0x00, 0x08, 0x10, 0x04, 0x28, 0x10,0x00, 0x00};
+	uint32_t ret;
 	struct rt_serial_device *serial = &(uart_obj[UART1_INDEX].serial);
-	
-	struct stm32_uart *uart;
+	config_info_t info_config_rx;
+//	struct stm32_uart *uart;
 	RT_ASSERT(serial != RT_NULL);
+	//定义modbus通信变量
 
-  uart = rt_container_of(serial, struct stm32_uart, serial);
+	uint16_t mb_addr = 0;
+	uint16_t mb_length = 0;
+	uint16_t read_date_buff[300] = {0};
+	
+	uint8_t rx_date[1024] = {0};
+	uint8_t tx_date[1024] = {0};
+
+//  uart = rt_container_of(serial, struct stm32_uart, serial);
 	//等待RTU返回的数据
 	while(1)
 	{
@@ -731,22 +814,29 @@ void thread_usart1_entry(void* parameter)
 		RT_EVENT_FLAG_AND | RT_EVENT_FLAG_CLEAR,
 		RT_WAITING_FOREVER, &e) == RT_EOK)//调试时更改为  RT_WAITING_FOREVER
 		{
+			
 			usart1_count = 0;
 			
+			for(uint16_t i=0;i<usart1_rec_length;i++)
+			{
+				rx_date[i] = usart1_rec_buff[i];
+			}
+//			rt_usart1_sendbuff(rx_date,usart1_rec_length);
 			if(usart1_rec_length > 0)//接收到数据
 			{
 				
+//				rt_usart1_sendbuff(rx_date,usart1_rec_length);
 				//进行数据校验  
-				if(_modbus_rtu_check_integrity(&usart1_rec_buff[0],  usart1_rec_length)==usart1_rec_length)
+				if(_modbus_rtu_check_integrity(&rx_date[0],  usart1_rec_length)==usart1_rec_length)
 				{
 
 					//对数据进行处理
-					rt_usart1_sendbuff(usart1_rec_buff,usart1_rec_length);//调试时使用
+//					rt_usart1_sendbuff(rx_date,usart1_rec_length);//调试时使用
 					
 					
 					
 					//判断是给哪个服务器的数据
-					if(usart1_rec_buff[0] == 0x01)
+					if(rx_date[0] == 0x01)
 					{
 						//数据接收完成 发送事件标志
 						rt_event_send(&event,EVENT_FLAG_usart_clent1);
@@ -754,7 +844,7 @@ void thread_usart1_entry(void* parameter)
 					}
 					
 					//判断是给哪个服务器的数据
-					if(usart1_rec_buff[0] == 0x02)
+					if(rx_date[0] == 0x02)
 					{
 						//数据接收完成 发送事件标志
 						rt_event_send(&event,EVENT_FLAG_usart_clent2);
@@ -762,7 +852,7 @@ void thread_usart1_entry(void* parameter)
 					}
 					
 					//判断是给哪个服务器的数据
-					if(usart1_rec_buff[0] == 0x03)
+					if(rx_date[0] == 0x03)
 					{
 						//数据接收完成 发送事件标志
 						rt_event_send(&event,EVENT_FLAG_usart_clent3);
@@ -770,13 +860,78 @@ void thread_usart1_entry(void* parameter)
 					}
 					
 					//当ID为0X0A时说明是RTU发送给自己的配置信息
-					if(usart1_rec_buff[0] == 0x0A)
+					if(rx_date[0] == 0x0A)
 					{
-						//校验成功将配置信息更新并保存  进行配置更新时应该对串口2进行互斥处理
+						mb_addr = (rx_date[2] << 8 ) + rx_date[3];
+						//mb_addr = mb_addr + STM32FLASH_BASE;
+						mb_length = (rx_date[4] << 8 ) + rx_date[5];
 						
+						if(mb_length % 2 != 0)
+						{
+							mb_length = mb_length+1;
+						}
+						//校验成功将配置信息更新并保存  进行配置更新时应该对串口2进行互斥处理
+						//判断功能码
+						if(usart1_rec_buff[1] == 0x03)
+						{
+							//读取flash中的数据
+							ret = FLASH_Read((uint32_t)mb_addr+STM32FLASH_BASE, read_date_buff, mb_length);
+							
+							if(ret == mb_length*2)//读取完成
+							{
+								//将数据进行打包并发送出去
+								tx_date[0] = rx_date[0];
+								tx_date[1] = rx_date[1];
+								tx_date[2] = mb_length * 2;
+								
+								for(uint16_t i=0;i<mb_length/2;i++)
+								{
+									tx_date[3+i*2] = read_date_buff[i] >> 8;
+									tx_date[3+i*2+1] = read_date_buff[i] & 0x00ff;
+								}
+								
+								mb_length = _modbus_rtu_send_msg_pre(tx_date,mb_length+3);
+								
+								rt_usart1_sendbuff(tx_date,mb_length);
+								
+							}
+							else//读取错误
+							{
+								
+							}
+						}
+						
+						if(rx_date[1] == 0x06)
+						{
+							
+						}
+						
+						if(rx_date[1] == 0x10)
+						{
+							//组合数据
+							for(uint16_t i=0;i<mb_length;i++)
+							{
+								read_date_buff[i] = (rx_date[7+i*2] << 8) + rx_date[7+i*2+1];
+							}
+							//将数据写入flash
+							FLASH_WriteNotCheck((uint32_t)mb_addr+STM32FLASH_BASE,read_date_buff,mb_length);
+							
+							//将数据进行打包并发送出去
+							tx_date[0] = rx_date[0];
+							tx_date[1] = rx_date[1];
+							tx_date[2] = rx_date[2];
+							tx_date[3] = rx_date[3];
+							tx_date[4] = rx_date[4];
+							tx_date[5] = rx_date[5];
+							
+							mb_length = _modbus_rtu_send_msg_pre(tx_date,6);
+							//发送返回数据
+							rt_usart1_sendbuff(tx_date,mb_length);
+							
+							//重启
+						}
 						
 						//返回接收完成应答
-						
 	
 					}
 					//清除数据   测试使用

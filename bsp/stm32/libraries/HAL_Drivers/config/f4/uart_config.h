@@ -324,6 +324,48 @@ int rt_usart1_receive(void);
 void thread_usart1_entry(void* parameter);
 
 
+typedef  struct _config_info_{
+    uint16_t ID;  //本机ID 
+	
+		uint16_t rtu_id;
+	
+		//串口配置
+		struct usart_config {
+			int usart_BaudRate;    //波特率
+			uint16_t usart_parity;      //检验
+			uint16_t usart_stopbits;    //停止位
+			uint16_t usart_datebits;    //数据位
+		}__attribute__((packed)) usart_config_t[4];//分别为串口1,2,3,6的配置信息
+	 
+		//服务器连接配置
+		struct clent_config {
+			uint16_t clent_id;         //连接服务器的ID
+			char clent_ip[15];             //ip地址
+			uint16_t clent_port;       //连接的端口号
+		}__attribute__((packed)) clent_config_t[3];//分别为clent1,2,3的配置信息
+
+		//mqtt1 配置信息
+		struct mqtt_config {
+			uint16_t mqtt_id;           //mqtt连接对应的ID
+			char mqtt_uri[27];          //URI : "TCP://IP:PORT"
+			char mqtt_SUBTopicNAME[20];     //mqtt订阅的主题
+			char mqtt_PUBTopicNAME[20];     //mqtt发布的主题
+			char mqtt_username[10];         //用户名
+			char mqtt_password[10];         //密码    用户名和密码用于加密连接
+		}__attribute__((packed)) mqtt_config_t[3];//分别为串口1,2,3,6的配置信息
+		
+		//其他配置
+		uint16_t relink_time;        //断线重连时间
+		uint16_t heard_beat_time;    //心跳包实际
+		uint16_t timeout_tx;         //传输超时时间
+		char heard_beat_date[10];        //心跳包字符
+		uint16_t MQTT_SUBSCRIBE_HANDLERS ; //mqtt服务器连接的最大数量
+		
+}__attribute__((packed)) config_info_t;
+
+
+
+
 #ifdef __cplusplus
 }
 #endif
